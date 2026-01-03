@@ -1,0 +1,110 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "triggers": {
+            "Microsoft_Sentinel_incident": {
+                "type": "ApiConnectionWebhook",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                        }
+                    },
+                    "body": {
+                        "callback_url": "@listCallbackUrl()"
+                    },
+                    "path": "/incident-creation"
+                }
+            }
+        },
+        "actions": {
+            "For_each": {
+                "foreach": "@body('GPT3_Completes_your_prompt')?['choices']",
+                "actions": {
+                    "Add_comment_to_incident_(V3)": {
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "body": {
+                                "incidentArmId": "@triggerBody()?['object']?['id']",
+                                "message": "<p class=\"editor-paragraph\">@{items('For_each')?['text']}</p>"
+                            },
+                            "path": "/Incidents/Comment"
+                        }
+                    }
+                },
+                "runAfter": {
+                    "For_each_1": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Foreach"
+            },
+            "For_each_1": {
+                "foreach": "@triggerBody()?['object']?['properties']?['additionalData']?['tactics']",
+                "actions": {
+                    "GPT3_Completes_your_prompt": {
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['openaiip-1']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "body": {
+                                "model": "gpt-3.5-turbo-instruct",
+                                "prompt": "Enrich the incident with explanation of this MITRE ATT&CK tactic: @{items('For_each_1')}",
+                                "n": 1,
+                                "best_of": 1,
+                                "temperature": 1,
+                                "max_tokens": 100,
+                                "frequency_penalty": 0,
+                                "presence_penalty": 0
+                            },
+                            "path": "/v1/completions"
+                        }
+                    }
+                },
+                "runAfter": {},
+                "type": "Foreach"
+            }
+        },
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "type": "Object",
+                "defaultValue": {}
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "type": "Object",
+            "value": {
+                "azuresentinel": {
+                    "id": "/subscriptions/75718c2b-9f48-4cb8-b4f8-7cbdf89f527e/providers/Microsoft.Web/locations/northcentralus/managedApis/azuresentinel",
+                    "connectionId": "/subscriptions/75718c2b-9f48-4cb8-b4f8-7cbdf89f527e/resourceGroups/TestResGrp/providers/Microsoft.Web/connections/azuresentinel",
+                    "connectionName": "azuresentinel",
+                    "connectionProperties": {
+                        "authentication": {
+                            "type": "ManagedServiceIdentity"
+                        }
+                    }
+                },
+                "openaiip-1": {
+                    "id": "/subscriptions/75718c2b-9f48-4cb8-b4f8-7cbdf89f527e/providers/Microsoft.Web/locations/northcentralus/managedApis/openaiip",
+                    "connectionId": "/subscriptions/75718c2b-9f48-4cb8-b4f8-7cbdf89f527e/resourceGroups/TestResGrp/providers/Microsoft.Web/connections/openaiip",
+                    "connectionName": "openaiip",
+                    "connectionProperties": {}
+                }
+            }
+        }
+    }
+}
