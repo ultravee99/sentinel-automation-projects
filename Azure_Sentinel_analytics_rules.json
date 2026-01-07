@@ -1,0 +1,247 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/fb7df706-e89a-49f9-9ef0-85d82bef45c4')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/fb7df706-e89a-49f9-9ef0-85d82bef45c4')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "displayName": "High count of connections by client IP on many ports",
+                "description": "Identifies when 30 or more ports are used for a given client IP in 10 minutes occurring on the IIS server.\nThis could be indicative of attempted port scanning or exploit attempt at internet facing web applications.\nThis could also simply indicate a misconfigured service or device.\nReferences:\nIIS status code mapping - https://support.microsoft.com/help/943891/the-http-status-code-in-iis-7-0-iis-7-5-and-iis-8-0\nWin32 Status code mapping - https://msdn.microsoft.com/library/cc231199.aspx",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "let timeBin = 10m;\nlet portThreshold = 30;\nlet PentestingIPAddresses = (_GetWatchlist('PentestIPs') | project IPAddress);\nW3CIISLog\n| extend scStatusFull = strcat(scStatus, \".\",scSubStatus)\n// Map common IIS codes\n| extend scStatusFull_Friendly = case(\nscStatusFull == \"401.0\", \"Access denied.\",\nscStatusFull == \"401.1\", \"Logon failed.\",\nscStatusFull == \"401.2\", \"Logon failed due to server configuration.\",\nscStatusFull == \"401.3\", \"Unauthorized due to ACL on resource.\",\nscStatusFull == \"401.4\", \"Authorization failed by filter.\",\nscStatusFull == \"401.5\", \"Authorization failed by ISAPI/CGI application.\",\nscStatusFull == \"403.0\", \"Forbidden.\",\nscStatusFull == \"403.4\", \"SSL required.\",\n\"See - https://support.microsoft.com/help/943891/the-http-status-code-in-iis-7-0-iis-7-5-and-iis-8-0\")\n// Mapping to Hex so can be mapped using website in comments above\n| extend scWin32Status_Hex = tohex(tolong(scWin32Status))\n// Map common win32 codes\n| extend scWin32Status_Friendly = case(\nscWin32Status_Hex =~ \"775\", \"The referenced account is currently locked out and cannot be logged on to.\",\nscWin32Status_Hex =~ \"52e\", \"Logon failure: Unknown user name or bad password.\",\nscWin32Status_Hex =~ \"532\", \"Logon failure: The specified account password has expired.\",\nscWin32Status_Hex =~ \"533\", \"Logon failure: Account currently disabled.\",\nscWin32Status_Hex =~ \"2ee2\", \"The request has timed out.\",\nscWin32Status_Hex =~ \"0\", \"The operation completed successfully.\",\nscWin32Status_Hex =~ \"1\", \"Incorrect function.\",\nscWin32Status_Hex =~ \"2\", \"The system cannot find the file specified.\",\nscWin32Status_Hex =~ \"3\", \"The system cannot find the path specified.\",\nscWin32Status_Hex =~ \"4\", \"The system cannot open the file.\",\nscWin32Status_Hex =~ \"5\", \"Access is denied.\",\nscWin32Status_Hex =~ \"8009030e\", \"SEC_E_NO_CREDENTIALS\",\nscWin32Status_Hex =~ \"8009030C\", \"SEC_E_LOGON_DENIED\",\n\"See - https://msdn.microsoft.com/library/cc231199.aspx\")\n// decode URI when available\n| extend decodedUriQuery = url_decode(csUriQuery)\n// Count of attempts by client IP on many ports\n| summarize makeset(sPort), makeset(decodedUriQuery), makeset(csUserName), makeset(sSiteName), makeset(sPort), makeset(csUserAgent), makeset(csMethod), makeset(csUriQuery), makeset(scStatusFull), makeset(scStatusFull_Friendly), makeset(scWin32Status_Hex), makeset(scWin32Status_Friendly), ConnectionsCount = count() by bin(TimeGenerated, timeBin), cIP, Computer, sIP\n| extend portCount = arraylength(set_sPort)\n| where portCount >= portThreshold\n| project TimeGenerated, cIP, set_sPort, set_csUserName, set_decodedUriQuery, Computer, set_sSiteName, sIP, set_csUserAgent, set_csMethod, set_scStatusFull, set_scStatusFull_Friendly, set_scWin32Status_Hex, set_scWin32Status_Friendly, ConnectionsCount, portCount\n| order by portCount\n",
+                "queryFrequency": "P1D",
+                "queryPeriod": "P1D",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT1H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [
+                    "InitialAccess"
+                ],
+                "techniques": [
+                    "T1190"
+                ],
+                "subTechniques": [],
+                "alertRuleTemplateName": "44a555d8-ecee-4a25-95ce-055879b4b14b",
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": {},
+                "entityMappings": [
+                    {
+                        "entityType": "IP",
+                        "fieldMappings": [
+                            {
+                                "identifier": "Address",
+                                "columnName": "cIP"
+                            }
+                        ]
+                    }
+                ],
+                "sentinelEntitiesMappings": null,
+                "templateVersion": "1.0.3"
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/de86a9d1-8993-45fb-b93b-04b612a73e3c')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/de86a9d1-8993-45fb-b93b-04b612a73e3c')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "NRT",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "displayName": "User Added to Entra - NRT",
+                "description": "",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "AuditLogs\r\n| where OperationName == \"Add user\"",
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "tactics": [
+                    "Persistence"
+                ],
+                "techniques": [
+                    "T1136"
+                ],
+                "subTechniques": [
+                    "T1136.003"
+                ],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": null,
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/ff657e61-6c5f-4a15-9888-8b01e041c2b3')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/ff657e61-6c5f-4a15-9888-8b01e041c2b3')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "displayName": "New User Added to Entra",
+                "description": "",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "AuditLogs\r\n| where OperationName == \"Add user\"",
+                "queryFrequency": "PT5M",
+                "queryPeriod": "PT5M",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [
+                    "Persistence"
+                ],
+                "techniques": [
+                    "T1136"
+                ],
+                "subTechniques": [
+                    "T1136.003"
+                ],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": null,
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/e1e6df63-159d-4568-9d31-eccac16cc69d')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/e1e6df63-159d-4568-9d31-eccac16cc69d')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "ThreatIntelligence",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "enabled": true,
+                "alertRuleTemplateName": "0dd422ee-e6af-4204-b219-f59ac172e4c6",
+                "description": "This rule generates an alert when a Microsoft Defender Threat Intelligence Indicator gets matched with your event logs. The alerts are very high fidelity.\n",
+                "displayName": "Microsoft Defender Threat Intelligence Analytics",
+                "severity": "Medium",
+                "tactics": [
+                    "Persistence",
+                    "LateralMovement"
+                ],
+                "techniques": [],
+                "subTechniques": []
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/8ff06aa6-bc4c-42c3-a925-fc0a95b8ba4b')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/8ff06aa6-bc4c-42c3-a925-fc0a95b8ba4b')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "MLBehaviorAnalytics",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "enabled": true,
+                "alertRuleTemplateName": "737a2ce1-70a3-4968-9e90-3e6aca836abf"
+            }
+        },
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/alertRules/a263adea-78c6-4a4b-9001-7d85c815802e')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/a263adea-78c6-4a4b-9001-7d85c815802e')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/alertRules",
+            "kind": "Scheduled",
+            "apiVersion": "2023-12-01-preview",
+            "properties": {
+                "displayName": "NewProcesses",
+                "description": "",
+                "severity": "Medium",
+                "enabled": true,
+                "query": "SecurityEvent\r\n| where EventID == \"4688\"",
+                "queryFrequency": "PT5H",
+                "queryPeriod": "PT5H",
+                "triggerOperator": "GreaterThan",
+                "triggerThreshold": 0,
+                "suppressionDuration": "PT5H",
+                "suppressionEnabled": false,
+                "startTimeUtc": null,
+                "tactics": [
+                    "Persistence"
+                ],
+                "techniques": [
+                    "T1543"
+                ],
+                "subTechniques": [],
+                "alertRuleTemplateName": null,
+                "incidentConfiguration": {
+                    "createIncident": true,
+                    "groupingConfiguration": {
+                        "enabled": false,
+                        "reopenClosedIncident": false,
+                        "lookbackDuration": "PT5H",
+                        "matchingMethod": "AllEntities",
+                        "groupByEntities": [],
+                        "groupByAlertDetails": [],
+                        "groupByCustomDetails": []
+                    }
+                },
+                "eventGroupingSettings": {
+                    "aggregationKind": "SingleAlert"
+                },
+                "alertDetailsOverride": null,
+                "customDetails": null,
+                "entityMappings": null,
+                "sentinelEntitiesMappings": null,
+                "templateVersion": null
+            }
+        }
+    ]
+}

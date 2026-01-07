@@ -1,0 +1,102 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace": {
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "id": "[concat(resourceId('Microsoft.OperationalInsights/workspaces/providers', parameters('workspace'), 'Microsoft.SecurityInsights'),'/AutomationRules/00ca3b56-7c5f-437c-93eb-5c0dd4124413')]",
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/00ca3b56-7c5f-437c-93eb-5c0dd4124413')]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/AutomationRules",
+            "apiVersion": "2024-04-01-preview",
+            "properties": {
+                "displayName": "New User Added to Entra",
+                "order": 1,
+                "triggeringLogic": {
+                    "isEnabled": true,
+                    "triggersOn": "Incidents",
+                    "triggersWhen": "Created",
+                    "conditions": [
+                        {
+                            "conditionType": "Property",
+                            "conditionProperties": {
+                                "propertyName": "IncidentTitle",
+                                "operator": "Contains",
+                                "propertyValues": [
+                                    "User Added"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "actions": [
+                    {
+                        "order": 1,
+                        "actionType": "ModifyProperties",
+                        "actionConfiguration": {
+                            "severity": null,
+                            "status": "Active",
+                            "classification": null,
+                            "classificationReason": null,
+                            "classificationComment": null,
+                            "owner": null,
+                            "labels": null
+                        }
+                    },
+                    {
+                        "order": 2,
+                        "actionType": "ModifyProperties",
+                        "actionConfiguration": {
+                            "severity": "High",
+                            "status": null,
+                            "classification": null,
+                            "classificationReason": null,
+                            "classificationComment": null,
+                            "owner": null,
+                            "labels": null
+                        }
+                    },
+                    {
+                        "order": 3,
+                        "actionType": "ModifyProperties",
+                        "actionConfiguration": {
+                            "severity": null,
+                            "status": null,
+                            "classification": null,
+                            "classificationReason": null,
+                            "classificationComment": null,
+                            "owner": {
+                                "objectId": "2d7c154f-67fa-4453-b670-07e0e28dfb2f",
+                                "email": null,
+                                "assignedTo": "Suchi .",
+                                "userPrincipalName": "suchipragyanr3_gmail.com#EXT#@suchipragyanr3gmail.onmicrosoft.com"
+                            },
+                            "labels": null
+                        }
+                    },
+                    {
+                        "order": 4,
+                        "actionType": "ModifyProperties",
+                        "actionConfiguration": {
+                            "severity": null,
+                            "status": null,
+                            "classification": null,
+                            "classificationReason": null,
+                            "classificationComment": null,
+                            "owner": null,
+                            "labels": [
+                                {
+                                    "labelName": "Automated",
+                                    "labelType": "User"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}
